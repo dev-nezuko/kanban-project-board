@@ -1,36 +1,18 @@
+"""Create the local demo table when missing; leave existing cards intact."""
 import boto3
-from botocore.client import Config
 
-# Setup boto3 to use DynamoDB local
-boto3.setup_default_session(
-    aws_access_key_id='dummy',
-    aws_secret_access_key='dummy',
-    region_name='us-west-2'
-)
-dynamodb = boto3.resource('dynamodb', endpoint_url='http://dynamodb:8000', config=Config(signature_version='s3v4'))
+def ensure_card_table(resource=None):
+    if resource is None:
+        resource = boto3.resource('dynamodb', endpoint_url='http://dynamodb:8000', region_name='us-west-2', aws_access_key_id='dummy', aws_secret_access_key='dummy')
+    table = resource.Table('Card')
+    try:
+        table.load()
+        return table
+    except resource.meta.client.exceptions.ResourceNotFoundException:
+        table = resource.create_table(TableName='Card', KeySchema=[{'AttributeName':'id','KeyType':'HASH'}], AttributeDefinitions=[{'AttributeName':'id','AttributeType':'S'}], ProvisionedThroughput={'ReadCapacityUnits':10,'WriteCapacityUnits':10})
+        table.wait_until_exists()
+        return table
 
-# Create the Card table
-card_table = dynamodb.create_table(
-    TableName='Card',
-    KeySchema=[
-        {
-            'AttributeName': 'id',
-            'KeyType': 'HASH'
-        }
-    ],
-    AttributeDefinitions=[
-        {
-            'AttributeName': 'id',
-            'AttributeType': 'S'
-        },
-    ],
-    ProvisionedThroughput={
-        'ReadCapacityUnits': 10,
-        'WriteCapacityUnits': 10
-    }
-)
-
-# Wait for the table to be created
-card_table.meta.client.get_waiter('table_exists').wait(TableName='Card')
-
-print("Card table has been created.")
+if __name__ == '__main__':
+    ensure_card_table()
+    print('Local Card table is ready.')

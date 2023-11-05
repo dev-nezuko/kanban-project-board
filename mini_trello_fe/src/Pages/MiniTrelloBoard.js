@@ -17,7 +17,8 @@ export const MiniTrelloBoard = () => {
   const [newCardTitle, setNewCardTitle] = useState("");
   const [newCardDescription, setNewCardDescription] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { data, loading, error } = useQuery(GET_CARDS);
+  const { data, loading, error, refetch } = useQuery(GET_CARDS);
+  const [operationError, setOperationError] = useState("");
   const [allCards, setAllCards] = useState();
   const [updateCardData, setUpdateCardData] = useState(null);
 
@@ -27,20 +28,20 @@ export const MiniTrelloBoard = () => {
         {
           id: "todo",
           title: "To-Do",
-          label: "2/2",
-          cards: data?.allCards.filter((card) => card.status === "todo"),
+
+          cards: (data?.allCards || []).filter((card) => card.status === "todo"),
         },
         {
           id: "in-progress",
           title: "In Progress",
-          label: "0/0",
-          cards: data?.allCards.filter((card) => card.status === "in-progress"),
+
+          cards: (data?.allCards || []).filter((card) => card.status === "in-progress"),
         },
         {
           id: "done",
           title: "Done",
-          label: "0/0",
-          cards: data?.allCards.filter((card) => card.status === "done"),
+
+          cards: (data?.allCards || []).filter((card) => card.status === "done"),
         },
       ],
     });
@@ -52,7 +53,11 @@ export const MiniTrelloBoard = () => {
   const [deleteCard] = useMutation(DELETE_CARD);
 
   const moveCardHandler = (id, newStatus) => {
-    moveCard({ variables: { id, status: newStatus } });
+    setOperationError("");
+    return moveCard({ variables: { id, status: newStatus } }).catch(() => {
+      setOperationError("Could not move that card. The saved board will be reloaded.");
+      refetch().catch(() => {});
+    });
   };
 
   const handleInputChange = (e) => {
@@ -72,8 +77,8 @@ export const MiniTrelloBoard = () => {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
+  if (loading) return <p role="status">Loading the board…</p>;
+  if (error) return <div role="alert">The local board API is unavailable. <button onClick={() => refetch()}>Retry</button></div>;
 
   const onDragEnd = (result) => {
     if (!result.destination) {
@@ -137,6 +142,7 @@ export const MiniTrelloBoard = () => {
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setUpdateCardData(null);
     setNewCardTitle("");
     setNewCardDescription("");
   };
@@ -156,22 +162,14 @@ export const MiniTrelloBoard = () => {
     })
       .then((result) => {
         const createdCard = result.data.createCard.card;
-        setAllCards((prevState) => {
-          const updatedLanes = [...prevState.lanes];
-          const todoLane = updatedLanes.find((lane) => lane.id === "todo");
-          if (todoLane) {
-            todoLane.cards.push({
-              id: createdCard.id,
-              title: createdCard.title,
-              description: createdCard.description,
-            });
-          }
-          return { lanes: updatedLanes };
-        });
+        setAllCards((previous) => ({
+          ...previous,
+          lanes: previous.lanes.map((lane) => lane.id === "todo" ? {...lane, cards: [...lane.cards, createdCard]} : lane),
+        }));
         closeModal();
       })
       .catch((error) => {
-        console.error("Error adding card:", error);
+        setOperationError("Could not save the card. Your input is still available.");
       });
   };
 
@@ -189,7 +187,7 @@ export const MiniTrelloBoard = () => {
           closeModal();
         })
         .catch((error) => {
-          console.error("Error updating card:", error);
+          setOperationError("Could not update the card. Please try again.");
         });
     }
   };
@@ -203,11 +201,13 @@ export const MiniTrelloBoard = () => {
         }));
         return { lanes: updatedLanes };
       });
-    });
+    }).catch(() => setOperationError("Could not delete the card. Please try again."));
   };
 
   return (
     <>
+      <header className="board-heading"><p>LOCAL KANBAN DEMO</p><h1>A little space for work in progress.</h1><span>Create cards, move them between stages, and keep the next step visible.</span></header>
+      {operationError && <p role="alert" className="operation-error">{operationError}</p>}
       <TicketFormModal
         handleInputChange={handleInputChange}
         saveCard={saveCard}
@@ -229,7 +229,7 @@ export const MiniTrelloBoard = () => {
                   {...provided.droppableProps}
                   className="status-column"
                 >
-                  <h2>{lane.title}</h2>
+                  <h2>{lane.title} <span className="lane-count">{lane.cards?.length || 0}</span></h2>
                   {lane?.cards?.map((card, index) => (
                     <Draggable
                       key={card.id}
@@ -246,16 +246,8 @@ export const MiniTrelloBoard = () => {
                           <div className="card-header">
                             {card.title}
                             <div className="card-icons">
-                              <FontAwesomeIcon
-                                icon={faEdit}
-                                onClick={() => openUpdateModal(card)}
-                                className="edit-icon"
-                              />
-                              <FontAwesomeIcon
-                                icon={faTrash}
-                                onClick={() => deleteCardHandler(card.id)}
-                                className="delete-icon"
-                              />
+                              <button aria-label={`Edit ${card.title}`} onClick={() => openUpdateModal(card)}><FontAwesomeIcon icon={faEdit} className="edit-icon" /></button>
+                              <button aria-label={`Delete ${card.title}`} onClick={() => deleteCardHandler(card.id)}><FontAwesomeIcon icon={faTrash} className="delete-icon" /></button>
                             </div>
                           </div>
                           {card.description}
@@ -263,6 +255,7 @@ export const MiniTrelloBoard = () => {
                       )}
                     </Draggable>
                   ))}
+                  {provided.placeholder}
                 </div>
               )}
             </Droppable>

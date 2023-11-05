@@ -54,15 +54,15 @@ class Card:
         expression_attribute_names = {}
         update_expression_elements = []
 
-        if title:
+        if title is not None:
             update_expression_elements.append('#t = :t')
             expression_attribute_values[':t'] = title
             expression_attribute_names['#t'] = 'title'
-        if description:
+        if description is not None:
             update_expression_elements.append('#d = :d')
             expression_attribute_values[':d'] = description
             expression_attribute_names['#d'] = 'description'
-        if status:
+        if status is not None:
             update_expression_elements.append('#s = :s')
             expression_attribute_values[':s'] = status
             expression_attribute_names['#s'] = 'status'  # Use a placeholder for reserved keyword
@@ -74,7 +74,7 @@ class Card:
                 Key={'id': card_id},
                 UpdateExpression=update_expression,
                 ExpressionAttributeValues=expression_attribute_values,
-                ExpressionAttributeNames=expression_attribute_names,  # Add this line
+                ExpressionAttributeNames=expression_attribute_names,
                 ReturnValues='UPDATED_NEW'
             )
             response = card_table.get_item(Key={'id': card_id})

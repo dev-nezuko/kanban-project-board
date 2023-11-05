@@ -1,5 +1,6 @@
 import React from "react";
 import Modal from "react-modal";
+if (typeof document !== "undefined" && document.getElementById("root")) Modal.setAppElement("#root");
 
 export const TicketFormModal = ({
   isModalOpen,
@@ -14,8 +15,9 @@ export const TicketFormModal = ({
 }) => {
   const customStyles = {
     content: {
-      width: "40rem",
+      width: "min(40rem, calc(100vw - 2rem))",
       height: "auto",
+      maxHeight: "85vh",
       margin: "auto",
       top: "50%",
       left: "50%",
@@ -26,7 +28,7 @@ export const TicketFormModal = ({
   };
 
   return (
-    <div className="status-column">
+    <div className="board-toolbar">
       <button onClick={openModal}>Add Card</button>
       <Modal
         isOpen={isModalOpen}
@@ -35,14 +37,16 @@ export const TicketFormModal = ({
         style={customStyles}
       >
         <h2>{updateCardData ? "Update Card" : "Add New Card"}</h2>
-        <input
+        <label htmlFor="card-title">Title</label>
+        <input id="card-title"
           type="text"
           placeholder="Card Title"
           value={updateCardData ? updateCardData.title : newCardTitle}
           onChange={handleInputChange}
           name="title"
         />
-        <textarea
+        <label htmlFor="card-description">Description</label>
+        <textarea id="card-description"
           placeholder="Card Description"
           name="description"
           value={
@@ -55,7 +59,7 @@ export const TicketFormModal = ({
             Update
           </button>
         ) : (
-          <button onClick={saveCard}>Save</button>
+          <button onClick={saveCard} disabled={!newCardTitle.trim()}>Save</button>
         )}
         <button onClick={closeModal}>Cancel</button>
       </Modal>
